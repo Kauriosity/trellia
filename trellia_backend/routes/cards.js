@@ -8,8 +8,18 @@ router.post('/', async (req, res) => {
   try {
     const { title, listId, position } = req.body;
     const card = await prisma.card.create({
-      data: { title, listId, position }
+      data: { title, listId, position },
+      include: { labels: true, members: true, checklists: { include: { items: true } }, comments: { include: { user: true } }, attachments: true }
     });
+
+    // Log activity
+    const list = await prisma.list.findUnique({ where: { id: listId }, include: { board: true } });
+    if (list) {
+      await prisma.activity.create({
+        data: { text: `added card "${title}" to list "${list.title}"`, cardId: card.id, boardId: list.board?.id }
+      }).catch(() => {});
+    }
+
     res.status(201).json(card);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -19,7 +29,7 @@ router.post('/', async (req, res) => {
 // Update a card
 router.put('/:id', async (req, res) => {
   try {
-    const { title, description, dueDate, listId, position, labelIds, memberIds } = req.body;
+    const { title, description, dueDate, listId, position, labelIds, memberIds, coverColor, coverUrl } = req.body;
     
     // Prepare data
     const updateData = {};
@@ -28,6 +38,8 @@ router.put('/:id', async (req, res) => {
     if (dueDate !== undefined) updateData.dueDate = dueDate;
     if (listId !== undefined) updateData.listId = listId;
     if (position !== undefined) updateData.position = position;
+    if (coverColor !== undefined) updateData.coverColor = coverColor;
+    if (coverUrl !== undefined) updateData.coverUrl = coverUrl;
     
     // Handle labels
     if (labelIds !== undefined) {
@@ -48,9 +60,30 @@ router.put('/:id', async (req, res) => {
       data: updateData,
       include: {
         labels: true,
-        members: true
+        members: true,
+        checklists: { include: { items: true } },
+        comments: { include: { user: true } },
+        attachments: true
       }
     });
+
+    // Log significant changes in activity
+    try {
+      const list = await prisma.list.findUnique({ where: { id: card.listId }, include: { board: true } });
+      if (list) {
+        if (dueDate !== undefined) {
+          await prisma.activity.create({
+            data: { text: dueDate ? `set due date to ${new Date(dueDate).toLocaleDateString()}` : `removed due date`, cardId: card.id, boardId: list.board?.id }
+          });
+        }
+        if (description !== undefined) {
+          await prisma.activity.create({
+            data: { text: `updated the description`, cardId: card.id, boardId: list.board?.id }
+          });
+        }
+      }
+    } catch (_) {}
+
     res.json(card);
   } catch (err) {
     res.status(500).json({ error: err.message });

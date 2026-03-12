@@ -8,22 +8,26 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  avatarUrl String?
-  cards     Card[]   @relation("CardMembers")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String     @id @default(uuid())
+  name        String
+  email       String     @unique
+  avatarUrl   String?
+  cards       Card[]     @relation("CardMembers")
+  comments    Comment[]
+  activities  Activity[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Board {
-  id          String   @id @default(uuid())
-  title       String
-  color       String   @default("#0079bf")
-  lists       List[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String     @id @default(uuid())
+  title        String
+  color        String     @default("#0079bf")
+  backgroundUrl String?
+  lists        List[]
+  activities   Activity[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 model List {
@@ -38,18 +42,23 @@ model List {
 }
 
 model Card {
-  id          String      @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
   description String?
   dueDate     DateTime?
+  coverColor  String?
+  coverUrl    String?
   position    Float
   listId      String
-  list        List        @relation(fields: [listId], references: [id], onDelete: Cascade)
+  list        List         @relation(fields: [listId], references: [id], onDelete: Cascade)
   labels      Label[]
-  members     User[]      @relation("CardMembers")
+  members     User[]       @relation("CardMembers")
   checklists  Checklist[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  comments    Comment[]
+  attachments Attachment[]
+  activities  Activity[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Label {
@@ -79,4 +88,37 @@ model ChecklistItem {
   checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  text      String
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  text      String
+  cardId    String?
+  card      Card?    @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  boardId   String?
+  board     Board?   @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 }

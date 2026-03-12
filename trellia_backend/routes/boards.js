@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get a specific board with lists, cards, and labels
+// Get a specific board with lists, cards, labels, members, checklists, comments, attachments
 router.get('/:id', async (req, res) => {
   try {
     const board = await prisma.board.findUnique({
@@ -30,7 +30,14 @@ router.get('/:id', async (req, res) => {
                 labels: true,
                 members: true,
                 checklists: {
-                  include: { items: true }
+                  include: { items: { orderBy: { createdAt: 'asc' } } }
+                },
+                comments: {
+                  include: { user: true },
+                  orderBy: { createdAt: 'asc' }
+                },
+                attachments: {
+                  orderBy: { createdAt: 'desc' }
                 }
               }
             }
@@ -54,6 +61,25 @@ router.post('/', async (req, res) => {
       data: { title, color }
     });
     res.status(201).json(board);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update board (title, color, background)
+router.put('/:id', async (req, res) => {
+  try {
+    const { title, color, backgroundUrl } = req.body;
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (color !== undefined) updateData.color = color;
+    if (backgroundUrl !== undefined) updateData.backgroundUrl = backgroundUrl;
+
+    const board = await prisma.board.update({
+      where: { id: req.params.id },
+      data: updateData
+    });
+    res.json(board);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import api from "@/lib/api";
-import { MoreHorizontal, Plus, Search, Filter, X } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Filter, X, Palette, Calendar, Users, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CardModal from "@/components/CardModal";
+
+// Board background presets
+const BG_COLORS = [
+  "#0079bf", "#d29034", "#519839", "#b04632", "#89609e",
+  "#cd5a91", "#4bbf6b", "#00aecc", "#838c91", "#172b4d"
+];
 
 export default function BoardClient({ boardId }) {
   const [board, setBoard] = useState(null);
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCard, setActiveCard] = useState(null);
-  
+
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLabelId, setFilterLabelId] = useState("");
@@ -21,6 +27,7 @@ export default function BoardClient({ boardId }) {
   const [allLabels, setAllLabels] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showBgPicker, setShowBgPicker] = useState(false);
 
   // New list state
   const [isAddingList, setIsAddingList] = useState(false);
@@ -62,21 +69,36 @@ export default function BoardClient({ boardId }) {
     fetchUsers();
   }, [fetchBoard, fetchLabels, fetchUsers]);
 
+  // When activeCard changes (opened), look it up from lists for fresh data
+  const refreshActiveCard = useCallback((cardId) => {
+    if (!cardId) return;
+    for (const list of lists) {
+      const found = (list.cards || []).find(c => c.id === cardId);
+      if (found) {
+        setActiveCard({ ...found, list });
+        return;
+      }
+    }
+  }, [lists]);
+
+  // After fetchBoard, refresh active card if modal is open
+  useEffect(() => {
+    if (activeCard) {
+      refreshActiveCard(activeCard.id);
+    }
+  }, [lists]);
+
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId, type } = result;
 
     if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-      return;
-    }
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
     if (type === "list") {
-      // Reorder lists
       const newLists = Array.from(lists);
       const [movedList] = newLists.splice(source.index, 1);
       newLists.splice(destination.index, 0, movedList);
-      
-      // Update positions
+
       const updatedLists = newLists.map((list, index) => ({
         ...list,
         position: (index + 1) * 1000,
@@ -89,15 +111,14 @@ export default function BoardClient({ boardId }) {
         });
       } catch (err) {
         console.error("Failed to reorder lists", err);
-        fetchBoard(); // Revert on failure
+        fetchBoard();
       }
       return;
     }
 
-    // Card Reordering
     const sourceListIndex = lists.findIndex((l) => l.id === source.droppableId);
     const destListIndex = lists.findIndex((l) => l.id === destination.droppableId);
-    
+
     if (sourceListIndex === -1 || destListIndex === -1) return;
 
     const sourceList = lists[sourceListIndex];
@@ -107,9 +128,7 @@ export default function BoardClient({ boardId }) {
     const [movedCard] = newSourceCards.splice(source.index, 1);
 
     if (source.droppableId === destination.droppableId) {
-      // Reorder within same list
       newSourceCards.splice(destination.index, 0, movedCard);
-      
       const updatedCards = newSourceCards.map((c, i) => ({ ...c, position: (i + 1) * 1000 }));
       const newLists = [...lists];
       newLists[sourceListIndex] = { ...sourceList, cards: updatedCards };
@@ -124,7 +143,6 @@ export default function BoardClient({ boardId }) {
         fetchBoard();
       }
     } else {
-      // Move between lists
       const newDestCards = Array.from(destList.cards || []);
       movedCard.listId = destination.droppableId;
       newDestCards.splice(destination.index, 0, movedCard);
@@ -153,11 +171,7 @@ export default function BoardClient({ boardId }) {
     if (!newListTitle.trim()) return;
 
     const maxPos = lists.length > 0 ? Math.max(...lists.map((l) => l.position)) : 0;
-    const newList = {
-      title: newListTitle,
-      boardId,
-      position: maxPos + 1000,
-    };
+    const newList = { title: newListTitle, boardId, position: maxPos + 1000 };
 
     try {
       const res = await api.post("/lists", newList);
@@ -169,68 +183,92 @@ export default function BoardClient({ boardId }) {
     }
   };
 
+  const setBoardBackground = async (color) => {
+    setBoard(prev => ({ ...prev, color }));
+    setShowBgPicker(false);
+    try {
+      await api.put(`/boards/${boardId}`, { color });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const hasActiveFilters = searchQuery || filterLabelId || filterMemberId || filterDueDate;
+
   if (loading) return <div className="p-4 text-white">Loading board...</div>;
   if (!board) return <div className="p-4 text-white">Board not found.</div>;
 
   return (
-    <div className="flex flex-col h-full bg-cover bg-center" style={{ backgroundColor: board.color }}>
+    <div
+      className="flex flex-col h-full bg-cover bg-center"
+      style={{ backgroundColor: board.color, backgroundImage: board.backgroundUrl ? `url(${board.backgroundUrl})` : undefined }}
+    >
       {/* Board Header */}
-      <div className="h-auto min-h-12 w-full bg-black/20 flex flex-wrap items-center px-4 py-2 gap-4">
-        <h1 className="text-white font-bold text-lg hover:bg-white/20 px-2 rounded cursor-pointer transition select-none">
+      <div className="h-auto min-h-12 w-full bg-black/20 backdrop-blur-sm flex flex-wrap items-center px-4 py-2 gap-3">
+        <h1 className="text-white font-bold text-lg hover:bg-white/20 px-2 py-1 rounded cursor-pointer transition select-none">
           {board.title}
         </h1>
-        <div className="h-6 w-px bg-white/30 hidden sm:block"></div>
-        
-        <div className="flex gap-2 text-sm text-white font-medium relative">
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition ${showFilters || searchQuery || filterLabelId || filterMemberId || filterDueDate ? 'bg-white text-blue-800' : 'bg-white/20 hover:bg-white/30'}`}
+        <div className="h-6 w-px bg-white/30 hidden sm:block" />
+
+        <div className="flex flex-wrap gap-2 text-sm text-white font-medium relative">
+          {/* Filters Button */}
+          <button
+            onClick={() => { setShowFilters(!showFilters); setShowBgPicker(false); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition ${
+              showFilters || hasActiveFilters ? "bg-white text-blue-800" : "bg-white/20 hover:bg-white/30"
+            }`}
           >
             <Filter className="w-4 h-4" /> Filters
-            {(searchQuery || filterLabelId || filterMemberId || filterDueDate) && (
+            {hasActiveFilters && (
               <span className="bg-blue-600 text-white text-xs px-1.5 rounded-full ml-1">Active</span>
             )}
           </button>
-          
+
+          {/* Filter Dropdown */}
           {showFilters && (
             <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-md shadow-xl border border-gray-200 p-4 z-50 text-gray-800 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold">Filter Cards</h4>
-                <button onClick={() => setShowFilters(false)} className="text-gray-500 hover:text-gray-700">
+                <h4 className="font-semibold text-gray-800">Filter Cards</h4>
+                <button onClick={() => setShowFilters(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              
-              <div className="mb-4 text-gray-800">
+
+              {/* Keyword */}
+              <div className="mb-4">
                 <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Keyword</label>
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Search cards..."
-                    className="w-full pl-8 pr-2 py-1.5 text-sm border-2 border-gray-200 rounded focus:border-blue-500 focus:outline-none"
+                    className="w-full pl-8 pr-2 py-1.5 text-sm border-2 border-gray-200 rounded focus:border-blue-500 focus:outline-none text-gray-800"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                   <Search className="w-4 h-4 text-gray-400 absolute left-2 top-2" />
                 </div>
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-xs text-blue-600 hover:underline mt-1">Clear</button>
+                )}
               </div>
 
+              {/* Members */}
               <div className="mb-4">
                 <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Members</label>
                 <div className="flex flex-col gap-1">
-                  <div 
+                  <div
                     onClick={() => setFilterMemberId("")}
-                    className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterMemberId === "" ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}
+                    className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterMemberId === "" ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"}`}
                   >
                     Any member
                   </div>
                   {allUsers.map(usr => (
-                    <div 
+                    <div
                       key={usr.id}
-                      onClick={() => setFilterMemberId(usr.id)}
-                      className={`text-sm py-1.5 px-2 rounded cursor-pointer flex items-center gap-2 ${filterMemberId === usr.id ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}
+                      onClick={() => setFilterMemberId(filterMemberId === usr.id ? "" : usr.id)}
+                      className={`text-sm py-1.5 px-2 rounded cursor-pointer flex items-center gap-2 ${filterMemberId === usr.id ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"}`}
                     >
-                      <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-700">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white">
                         {usr.name.charAt(0)}
                       </div>
                       {usr.name}
@@ -239,66 +277,90 @@ export default function BoardClient({ boardId }) {
                 </div>
               </div>
 
-              <div>
+              {/* Labels */}
+              <div className="mb-4">
                 <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Labels</label>
                 <div className="flex flex-col gap-1">
-                  <div 
+                  <div
                     onClick={() => setFilterLabelId("")}
-                    className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterLabelId === "" ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}
+                    className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterLabelId === "" ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"}`}
                   >
                     Any label
                   </div>
                   {allLabels.map(lbl => (
-                    <div 
+                    <div
                       key={lbl.id}
-                      onClick={() => setFilterLabelId(lbl.id)}
-                      className={`text-sm py-1.5 px-2 rounded cursor-pointer flex items-center gap-2 ${filterLabelId === lbl.id ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}
+                      onClick={() => setFilterLabelId(filterLabelId === lbl.id ? "" : lbl.id)}
+                      className={`text-sm py-1.5 px-2 rounded cursor-pointer flex items-center gap-2 ${filterLabelId === lbl.id ? "bg-blue-50 font-medium" : "hover:bg-gray-50"} text-gray-700`}
                     >
-                      <span className="w-4 h-4 rounded shadow-sm" style={{ backgroundColor: lbl.color }} />
+                      <span className="w-4 h-4 rounded shadow-sm shrink-0" style={{ backgroundColor: lbl.color }} />
                       {lbl.title}
                     </div>
                   ))}
                 </div>
               </div>
-              
+
+              {/* Due Date */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block mt-4">Due Date</label>
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Due Date</label>
                 <div className="flex flex-col gap-1">
-                  {["", "overdue", "nextDay", "hasDate"].map((val) => {
-                    const labels = {
-                      "": "Any date",
-                      "overdue": "Overdue",
-                      "nextDay": "Due in next 24 hours",
-                      "hasDate": "Has a due date"
-                    };
-                    return (
-                      <div 
-                        key={val}
-                        onClick={() => setFilterDueDate(val)}
-                        className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterDueDate === val ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`}
-                      >
-                        {labels[val]}
-                      </div>
-                    )
-                  })}
+                  {[["", "Any date"], ["overdue", "Overdue"], ["nextDay", "Due in next 24 hours"], ["hasDate", "Has a due date"]].map(([val, label]) => (
+                    <div
+                      key={val}
+                      onClick={() => setFilterDueDate(filterDueDate === val ? "" : val)}
+                      className={`text-sm py-1.5 px-2 rounded cursor-pointer ${filterDueDate === val ? "bg-blue-50 text-blue-700 font-medium" : "hover:bg-gray-50 text-gray-700"}`}
+                    >
+                      {label}
+                    </div>
+                  ))}
                 </div>
               </div>
 
+              {hasActiveFilters && (
+                <button
+                  onClick={() => { setSearchQuery(""); setFilterLabelId(""); setFilterMemberId(""); setFilterDueDate(""); }}
+                  className="mt-4 w-full text-sm text-center text-red-600 hover:bg-red-50 py-1.5 rounded transition"
+                >
+                  Clear all filters
+                </button>
+              )}
             </div>
           )}
-          
-          <button className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded transition">Share</button>
+
+          {/* Board Background */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowBgPicker(!showBgPicker); setShowFilters(false); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded transition bg-white/20 hover:bg-white/30"
+            >
+              <Palette className="w-4 h-4" /> Background
+            </button>
+            {showBgPicker && (
+              <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-md shadow-xl border border-gray-200 p-3 z-50">
+                <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Board Color</h4>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {BG_COLORS.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setBoardBackground(color)}
+                      className={`w-full h-8 rounded-md transition hover:scale-110 ${board.color === color ? "ring-2 ring-offset-1 ring-white" : ""}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Lists canvas */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
-        {/* Same Lists canvas as above */}
+      {/* Lists Canvas */}
+      <div className="flex-1 overflow-x-auto p-4">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="board" type="list" direction="horizontal">
             {(provided) => (
-              <div 
-                className="flex items-start gap-4 h-full"
+              <div
+                className="flex items-start gap-4 h-full min-w-max"
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
@@ -308,7 +370,7 @@ export default function BoardClient({ boardId }) {
                     list={list}
                     index={index}
                     fetchBoard={fetchBoard}
-                    setActiveCard={setActiveCard}
+                    setActiveCard={(card) => setActiveCard({ ...card, list })}
                     searchQuery={searchQuery}
                     filterLabelId={filterLabelId}
                     filterMemberId={filterMemberId}
@@ -317,13 +379,13 @@ export default function BoardClient({ boardId }) {
                 ))}
                 {provided.placeholder}
 
-                {/* Add New List Button */}
-                <div className="min-w-[272px] shrink-0">
+                {/* Add New List */}
+                <div className="min-w-[272px] w-[272px] shrink-0">
                   {isAddingList ? (
-                    <form onSubmit={addList} className="bg-white rounded-md p-2 shadow-sm">
+                    <form onSubmit={addList} className="bg-[#ebecf0] rounded-xl p-2 shadow-sm">
                       <input
                         autoFocus
-                        className="w-full text-sm p-1.5 border-2 border-blue-500 rounded focus:outline-none mb-2"
+                        className="w-full text-sm p-2 border-2 border-blue-500 rounded focus:outline-none mb-2 bg-white text-gray-800"
                         placeholder="Enter list title..."
                         value={newListTitle}
                         onChange={(e) => setNewListTitle(e.target.value)}
@@ -332,19 +394,19 @@ export default function BoardClient({ boardId }) {
                         <button type="submit" className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded hover:bg-blue-700">
                           Add list
                         </button>
-                        <button 
-                          type="button" 
-                          onClick={() => setIsAddingList(false)}
+                        <button
+                          type="button"
+                          onClick={() => { setIsAddingList(false); setNewListTitle(""); }}
                           className="text-gray-500 hover:text-gray-700"
                         >
-                          Cancel
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </form>
                   ) : (
-                    <button 
+                    <button
                       onClick={() => setIsAddingList(true)}
-                      className="w-full flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white p-3 rounded-md transition font-medium"
+                      className="w-full flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white p-3 rounded-xl transition font-medium"
                     >
                       <Plus className="w-5 h-5" />
                       Add another list
@@ -356,18 +418,20 @@ export default function BoardClient({ boardId }) {
           </Droppable>
         </DragDropContext>
       </div>
+
+      {/* Card Modal */}
       {activeCard && (
-        <CardModal 
-          card={{...activeCard, list: lists.find(l => l.id === activeCard.listId)}} 
-          onClose={() => setActiveCard(null)} 
-          fetchBoard={fetchBoard} 
+        <CardModal
+          card={activeCard}
+          onClose={() => setActiveCard(null)}
+          fetchBoard={fetchBoard}
         />
       )}
     </div>
   );
 }
 
-// Inline List component for simplicity
+// ─── List Component ─────────────────────────────────────────────────────────
 function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabelId, filterMemberId, filterDueDate }) {
   const [isAddingCard, setIsAddingCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState("");
@@ -390,13 +454,12 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
   };
 
   const deleteList = async () => {
-    if (confirm("Are you sure you want to delete this list and all its cards?")) {
-      try {
-        await api.delete(`/lists/${list.id}`);
-        fetchBoard();
-      } catch (err) {
-        console.error(err);
-      }
+    if (!confirm(`Delete list "${list.title}" and all its cards?`)) return;
+    try {
+      await api.delete(`/lists/${list.id}`);
+      fetchBoard();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -406,7 +469,7 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
 
     const cards = list.cards || [];
     const maxPos = cards.length > 0 ? Math.max(...cards.map(c => c.position)) : 0;
-    
+
     try {
       await api.post("/cards", {
         title: newCardTitle,
@@ -428,29 +491,36 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
           ref={provided.innerRef}
           {...provided.draggableProps}
           className={cn(
-            "w-[272px] shrink-0 flex flex-col bg-[#ebecf0] rounded-xl max-h-full",
+            "w-[272px] shrink-0 flex flex-col bg-[#ebecf0] rounded-xl",
+            "max-h-[calc(100vh-120px)]",
             snapshot.isDragging && "shadow-xl ring-2 ring-blue-400 rotate-2"
           )}
         >
           {/* List Header */}
-          <div {...provided.dragHandleProps} className="px-3 pt-3 pb-2 flex justify-between items-center group relative">
+          <div {...provided.dragHandleProps} className="px-3 pt-3 pb-2 flex items-center gap-1 group">
             {isEditingTitle ? (
               <input
                 autoFocus
-                className="font-semibold text-gray-800 text-sm px-1 w-full bg-white border-2 border-blue-500 rounded focus:outline-none"
+                className="font-semibold text-gray-800 text-sm px-2 py-1 w-full bg-white border-2 border-blue-500 rounded focus:outline-none"
                 value={listTitle}
                 onChange={(e) => setListTitle(e.target.value)}
                 onBlur={saveListTitle}
                 onKeyDown={(e) => e.key === "Enter" && saveListTitle()}
               />
             ) : (
-              <h2 onClick={() => setIsEditingTitle(true)} className="font-semibold text-gray-800 text-sm px-1 truncate cursor-pointer flex-1">
+              <h2
+                onClick={() => setIsEditingTitle(true)}
+                className="font-semibold text-gray-800 text-sm px-1 truncate cursor-pointer flex-1 hover:bg-white/50 rounded py-1"
+              >
                 {list.title}
               </h2>
             )}
-            <button onClick={deleteList} title="Delete List" className="text-gray-500 hover:bg-gray-300 hover:text-red-600 p-1.5 rounded transition opacity-0 group-hover:opacity-100 ml-2">
-              <MoreHorizontal className="w-4 h-4 hidden" />
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <button
+              onClick={deleteList}
+              title="Delete List"
+              className="text-gray-400 hover:bg-gray-300 hover:text-red-600 p-1.5 rounded transition opacity-0 group-hover:opacity-100 shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -461,36 +531,38 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
                 ref={provided.innerRef}
                 {...provided.droppableProps}
                 className={cn(
-                  "flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2 min-h-[30px] custom-scrollbar",
-                  snapshot.isDraggingOver && "bg-gray-200/50 rounded-lg transition-colors"
+                  "flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2 min-h-[30px]",
+                  snapshot.isDraggingOver && "bg-blue-100/40 rounded-lg transition-colors"
                 )}
               >
                 {(list.cards || []).map((card, idx) => {
                   const matchesSearch = !searchQuery || card.title.toLowerCase().includes(searchQuery.toLowerCase());
                   const matchesLabel = !filterLabelId || (card.labels || []).some(l => l.id === filterLabelId);
                   const matchesMember = !filterMemberId || (card.members || []).some(m => m.id === filterMemberId);
-                  
+
                   let matchesDate = true;
                   if (filterDueDate) {
-                    if (!card.dueDate) matchesDate = false;
-                    else {
+                    if (!card.dueDate) {
+                      matchesDate = filterDueDate === "";
+                    } else {
                       const dueTime = new Date(card.dueDate).getTime();
                       const now = Date.now();
                       const oneDay = 24 * 60 * 60 * 1000;
                       if (filterDueDate === "overdue") matchesDate = dueTime < now;
                       else if (filterDueDate === "nextDay") matchesDate = dueTime >= now && dueTime <= now + oneDay;
+                      else if (filterDueDate === "hasDate") matchesDate = true;
                     }
                   }
 
                   const isVisible = matchesSearch && matchesLabel && matchesMember && matchesDate;
-                  
+
                   return (
-                    <Card 
-                      key={card.id} 
-                      card={card} 
-                      index={idx} 
-                      fetchBoard={fetchBoard} 
-                      setActiveCard={setActiveCard} 
+                    <Card
+                      key={card.id}
+                      card={card}
+                      index={idx}
+                      fetchBoard={fetchBoard}
+                      setActiveCard={setActiveCard}
                       isVisible={isVisible}
                     />
                   );
@@ -506,7 +578,7 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
               <form onSubmit={addCard} className="pb-1">
                 <textarea
                   autoFocus
-                  className="w-full text-sm p-2 bg-white text-gray-800 rounded shadow-sm focus:outline-none resize-none min-h-[60px]"
+                  className="w-full text-sm p-2 bg-white text-gray-800 rounded shadow-sm focus:outline-none resize-none min-h-[60px] border-2 border-blue-500"
                   placeholder="Enter a title for this card..."
                   value={newCardTitle}
                   onChange={(e) => setNewCardTitle(e.target.value)}
@@ -521,12 +593,12 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
                   <button type="submit" className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded hover:bg-blue-700">
                     Add card
                   </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setIsAddingCard(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingCard(false); setNewCardTitle(""); }}
+                    className="text-gray-500 hover:text-gray-700 p-1.5 rounded hover:bg-gray-200"
                   >
-                    Cancel
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </form>
@@ -546,9 +618,9 @@ function List({ list, index, fetchBoard, setActiveCard, searchQuery, filterLabel
   );
 }
 
-// Inline Card component for simplicity
+// ─── Card Component ──────────────────────────────────────────────────────────
 function Card({ card, index, fetchBoard, setActiveCard, isVisible = true }) {
-  if (!isVisible && false) return null; // We are keeping them in DOM for DND to work, but we will hide or dim them
+  const isOverdue = card.dueDate && new Date(card.dueDate) < new Date();
 
   return (
     <Draggable draggableId={card.id} index={index}>
@@ -560,33 +632,97 @@ function Card({ card, index, fetchBoard, setActiveCard, isVisible = true }) {
           onClick={() => setActiveCard(card)}
           style={{
             ...provided.draggableProps.style,
-            display: isVisible ? 'block' : 'none'
+            display: isVisible ? undefined : "none"
           }}
           className={cn(
-            "bg-white rounded-lg shadow-sm p-2 mb-2 cursor-pointer group hover:ring-2 hover:ring-blue-400 focus:outline-none relative",
-            snapshot.isDragging && "shadow-lg rotate-3",
+            "bg-white rounded-lg shadow-sm mb-2 cursor-pointer group hover:ring-2 hover:ring-blue-400 focus:outline-none relative overflow-hidden",
+            snapshot.isDragging && "shadow-lg rotate-2 ring-2 ring-blue-500"
           )}
         >
-          {/* Labels */}
-          {card.labels && card.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {card.labels.map(label => (
-                <span
-                  key={label.id}
-                  className="h-2 w-8 rounded-full"
-                  style={{ backgroundColor: label.color }}
-                  title={label.title}
-                />
-              ))}
-            </div>
+          {/* Cover */}
+          {card.coverColor && (
+            <div className="h-8 w-full" style={{ backgroundColor: card.coverColor }} />
           )}
-          
-          <div className="text-sm text-gray-800 whitespace-pre-wrap word-break">{card.title}</div>
-          
-          {/* Edit pencil icon (appears on hover) */}
-          <button className="absolute top-2 right-2 p-1 text-gray-500 bg-gray-50 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition z-10">
-            {/* Edit icon SVG */}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+
+          <div className="p-2">
+            {/* Labels */}
+            {card.labels && card.labels.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {card.labels.map(label => (
+                  <span
+                    key={label.id}
+                    className="h-2 w-8 rounded-full"
+                    style={{ backgroundColor: label.color }}
+                    title={label.title}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="text-sm text-gray-800 whitespace-pre-wrap break-words pr-6">
+              {card.title}
+            </div>
+
+            {/* Card Badges Row */}
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              {card.dueDate && (
+                <span className={`text-xs flex items-center gap-0.5 px-1.5 py-0.5 rounded font-medium ${
+                  isOverdue ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                }`}>
+                  📅 {new Date(card.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              )}
+              {card.checklists && card.checklists.some(c => c.items?.length > 0) && (() => {
+                const total = card.checklists.reduce((a, c) => a + (c.items?.length || 0), 0);
+                const done = card.checklists.reduce((a, c) => a + (c.items?.filter(i => i.isCompleted).length || 0), 0);
+                return (
+                  <span className={`text-xs flex items-center gap-0.5 px-1.5 py-0.5 rounded ${done === total ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                    ✅ {done}/{total}
+                  </span>
+                );
+              })()}
+              {card.comments && card.comments.length > 0 && (
+                <span className="text-xs flex items-center gap-0.5 text-gray-500">
+                  💬 {card.comments.length}
+                </span>
+              )}
+              {card.attachments && card.attachments.length > 0 && (
+                <span className="text-xs flex items-center gap-0.5 text-gray-500">
+                  📎 {card.attachments.length}
+                </span>
+              )}
+            </div>
+
+            {/* Member Avatars */}
+            {card.members && card.members.length > 0 && (
+              <div className="flex justify-end gap-0.5 mt-1.5">
+                {card.members.slice(0, 3).map(m => (
+                  <div
+                    key={m.id}
+                    title={m.name}
+                    className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white"
+                  >
+                    {m.name.charAt(0)}
+                  </div>
+                ))}
+                {card.members.length > 3 && (
+                  <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-700">
+                    +{card.members.length - 3}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Edit icon — appears on hover */}
+          <button
+            className="absolute top-2 right-2 p-1 text-gray-500 bg-white hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition z-10 shadow-sm"
+            onClick={(e) => { e.stopPropagation(); setActiveCard(card); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
           </button>
         </div>
       )}

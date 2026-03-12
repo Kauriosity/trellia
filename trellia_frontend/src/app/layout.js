@@ -11,7 +11,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="antialiased min-h-screen flex flex-col">
         <TopNav />
-        <main className="flex-1 flex flex-col min-h-0 bg-transparent">
+        <main className="flex-1 flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 48px)' }}>
           {children}
         </main>
       </body>
