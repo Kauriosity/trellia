@@ -13,6 +13,13 @@ const BG_COLORS = [
   "#cd5a91", "#4bbf6b", "#00aecc", "#838c91", "#172b4d"
 ];
 
+const BG_IMAGES = [
+  "https://images.unsplash.com/photo-1477346611705-65d1883cee1e?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80",
+  "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80"
+];
+
 export default function BoardClient({ boardId }) {
   const [board, setBoard] = useState(null);
   const [lists, setLists] = useState([]);
@@ -183,11 +190,11 @@ export default function BoardClient({ boardId }) {
     }
   };
 
-  const setBoardBackground = async (color) => {
-    setBoard(prev => ({ ...prev, color }));
+  const setBoardBackground = async ({ color, backgroundUrl }) => {
+    setBoard(prev => ({ ...prev, color, backgroundUrl }));
     setShowBgPicker(false);
     try {
-      await api.put(`/boards/${boardId}`, { color });
+      await api.put(`/boards/${boardId}`, { color, backgroundUrl });
     } catch (err) {
       console.error(err);
     }
@@ -204,7 +211,7 @@ export default function BoardClient({ boardId }) {
       style={{ backgroundColor: board.color, backgroundImage: board.backgroundUrl ? `url(${board.backgroundUrl})` : undefined }}
     >
       {/* Board Header */}
-      <div className="h-auto min-h-12 w-full bg-black/20 backdrop-blur-sm flex flex-wrap items-center px-4 py-2 gap-3">
+      <div className="relative h-auto min-h-12 w-full bg-black/20 backdrop-blur-sm flex flex-wrap items-center px-4 py-2 gap-3 z-10">
         <h1 className="text-white font-bold text-lg hover:bg-white/20 px-2 py-1 rounded cursor-pointer transition select-none">
           {board.title}
         </h1>
@@ -226,7 +233,7 @@ export default function BoardClient({ boardId }) {
 
           {/* Filter Dropdown */}
           {showFilters && (
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-md shadow-xl border border-gray-200 p-4 z-50 text-gray-800 max-h-[80vh] overflow-y-auto">
+            <div className="fixed top-20 left-6 w-72 bg-white rounded-md shadow-xl border border-gray-200 p-4 z-[9999] text-gray-800 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-semibold text-gray-800">Filter Cards</h4>
                 <button onClick={() => setShowFilters(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded">
@@ -336,15 +343,26 @@ export default function BoardClient({ boardId }) {
               <Palette className="w-4 h-4" /> Background
             </button>
             {showBgPicker && (
-              <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-md shadow-xl border border-gray-200 p-3 z-50">
-                <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Board Color</h4>
-                <div className="grid grid-cols-5 gap-1.5">
+              <div className="fixed top-20 left-40 w-72 bg-white rounded-md shadow-xl border border-gray-200 p-3 z-[9999]">
+                <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Colors</h4>
+                <div className="grid grid-cols-5 gap-1.5 mb-4">
                   {BG_COLORS.map(color => (
                     <button
                       key={color}
-                      onClick={() => setBoardBackground(color)}
-                      className={`w-full h-8 rounded-md transition hover:scale-110 ${board.color === color ? "ring-2 ring-offset-1 ring-white" : ""}`}
+                      onClick={() => setBoardBackground({ color, backgroundUrl: null })}
+                      className={`w-full h-8 rounded-md transition hover:scale-110 ${board.color === color && !board.backgroundUrl ? "ring-2 ring-offset-1 ring-blue-500" : ""}`}
                       style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+                <h4 className="text-xs font-semibold text-gray-600 uppercase mb-2">Photos</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {BG_IMAGES.map(url => (
+                    <button
+                      key={url}
+                      onClick={() => setBoardBackground({ color: "#555", backgroundUrl: url })}
+                      className={`w-full h-12 rounded-md bg-cover bg-center transition hover:opacity-80 ${board.backgroundUrl === url ? "ring-2 ring-offset-1 ring-blue-500" : ""}`}
+                      style={{ backgroundImage: `url(${url})` }}
                     />
                   ))}
                 </div>
@@ -355,12 +373,12 @@ export default function BoardClient({ boardId }) {
       </div>
 
       {/* Lists Canvas */}
-      <div className="flex-1 overflow-x-auto p-4">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="board" type="list" direction="horizontal">
             {(provided) => (
               <div
-                className="flex items-start gap-4 h-full min-w-max"
+                className="flex flex-row flex-nowrap items-start gap-4 h-full min-w-max"
                 ref={provided.innerRef}
                 {...provided.droppableProps}
               >
@@ -640,9 +658,11 @@ function Card({ card, index, fetchBoard, setActiveCard, isVisible = true }) {
           )}
         >
           {/* Cover */}
-          {card.coverColor && (
+          {card.coverUrl ? (
+            <div className="h-32 w-full bg-cover bg-center" style={{ backgroundImage: `url(${card.coverUrl})` }} />
+          ) : card.coverColor ? (
             <div className="h-8 w-full" style={{ backgroundColor: card.coverColor }} />
-          )}
+          ):<></>}
 
           <div className="p-2">
             {/* Labels */}

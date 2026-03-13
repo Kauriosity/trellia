@@ -27,22 +27,24 @@ export default function TopNav() {
   }, []);
 
   const handleCreateBoard = async (e) => {
-    e.preventDefault();
-    if (!newBoardTitle.trim()) return;
-    try {
-      const { default: api } = await import("@/lib/api");
-      await api.post("/boards", { title: newBoardTitle });
-      setNewBoardTitle("");
-      setShowCreate(false);
-      router.push("/");
-      router.refresh();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  e.preventDefault();
+  if (!newBoardTitle.trim()) return;
 
+  try {
+    const { default: api } = await import("@/lib/api");
+
+    const res = await api.post("/boards", { title: newBoardTitle }); // CHANGE
+
+    setNewBoardTitle("");
+    setShowCreate(false);
+
+    router.push(`/b/${res.data.id}`); // IMPORTANT CHANGE
+  } catch (err) {
+    console.error(err);
+  }
+};
   return (
-    <nav className="h-12 w-full bg-black/30 backdrop-blur-sm border-b border-white/10 flex items-center px-4 justify-between sticky top-0 z-[200]">
+    <nav className="h-12 w-full bg-black/30 backdrop-blur-sm border-b border-white/10 flex items-center px-4 justify-between sticky top-0 z-[1000]">
       {/* Left: Logo + Nav buttons */}
       <div className="flex items-center gap-3">
         {/* Logo → home */}
@@ -70,15 +72,15 @@ export default function TopNav() {
               </button>
 
               {showCreate && (
-                <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg shadow-2xl border border-gray-200 z-[300] p-4">
-                  <h3 className="font-semibold text-gray-800 mb-1">Create board</h3>
+                <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg shadow-2xl border border-gray-200 z-[1100] p-4 text-gray-800">
+                  <h3 className="font-semibold mb-1">Create board</h3>
                   <p className="text-xs text-gray-500 mb-3">A board is made up of cards ordered on lists. Use it to manage projects, track information, or organize anything.</p>
                   <form onSubmit={handleCreateBoard} className="flex flex-col gap-2">
                     <input
                       autoFocus
                       type="text"
                       placeholder="Board title *"
-                      className="text-sm border-2 border-blue-500 rounded px-3 py-2 w-full focus:outline-none text-gray-900"
+                      className="text-sm border-2 border-blue-500 rounded px-3 py-2 w-full focus:outline-none"
                       value={newBoardTitle}
                       onChange={(e) => setNewBoardTitle(e.target.value)}
                       required

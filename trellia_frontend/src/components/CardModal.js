@@ -704,7 +704,7 @@ export default function CardModal({ card: initialCard, onClose, fetchBoard }) {
               <Users className="w-4 h-4 shrink-0" /> Members
             </button>
             {showMembersMenu && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-50 p-3 md:left-auto md:right-full md:mr-2 md:top-0">
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-[1000] p-3 md:left-auto md:right-full md:mr-2 md:top-0">
                 <h4 className="text-center font-semibold text-gray-600 border-b pb-2 mb-2 text-sm">Assign Members</h4>
                 <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
                   {allUsers.map(user => {
@@ -738,7 +738,7 @@ export default function CardModal({ card: initialCard, onClose, fetchBoard }) {
               <Tag className="w-4 h-4 shrink-0" /> Labels
             </button>
             {showLabelsMenu && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-50 p-3 md:left-auto md:right-full md:mr-2 md:top-0">
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-[1000] p-3 md:left-auto md:right-full md:mr-2 md:top-0">
                 <h4 className="text-center font-semibold text-gray-600 border-b pb-2 mb-2 text-sm">Labels</h4>
                 <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
                   {allLabels.map(label => {
@@ -781,7 +781,7 @@ export default function CardModal({ card: initialCard, onClose, fetchBoard }) {
               <Calendar className="w-4 h-4 shrink-0" /> Dates
             </button>
             {showDateMenu && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-50 p-3 md:left-auto md:right-full md:mr-2 md:top-0">
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-[1000] p-3 md:left-auto md:right-full md:mr-2 md:top-0">
                 <h4 className="text-center font-semibold text-gray-600 border-b pb-2 mb-2 text-sm">Due Date</h4>
                 <form onSubmit={handleSetDueDate} className="flex flex-col gap-2">
                   <input
@@ -816,7 +816,7 @@ export default function CardModal({ card: initialCard, onClose, fetchBoard }) {
               <Image className="w-4 h-4 shrink-0" /> Cover
             </button>
             {showCoverMenu && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-[300] p-3 md:left-auto md:right-full md:mr-2 md:top-0">
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded shadow-lg border border-gray-200 z-[1000] p-3 md:left-auto md:right-full md:mr-2 md:top-0">
                 <h4 className="text-center font-semibold text-gray-600 border-b pb-2 mb-2 text-sm">Card Cover</h4>
                 <p className="text-xs text-gray-400 mb-2">Colors</p>
                 <div className="grid grid-cols-5 gap-1.5 mb-3">
