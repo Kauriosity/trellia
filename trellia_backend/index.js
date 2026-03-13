@@ -32,6 +32,8 @@ app.use('/api/comments', commentsRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/activity', activityRouter);
 
+const errorHandler = require('./middleware/errorHandler');
+
 app.get('/api/labels', async (req, res) => {
   try {
     const labels = await prisma.label.findMany();
@@ -44,6 +46,9 @@ app.get('/api/labels', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({ message: 'Trellia Backend is running' });
 });
+
+// Final error handling middleware
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

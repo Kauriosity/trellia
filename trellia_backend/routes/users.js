@@ -1,16 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const userController = require('../controllers/userController');
 
-// Get all users (members)
-router.get('/', async (req, res) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Access system roster
+router.get('/', userController.getTeamRoster);
 
 module.exports = router;
