@@ -54,9 +54,9 @@ const boardController = {
       });
 
       if (!detailedBoard) {
-        return response.status(404).json({ 
+        return response.status(404).json({
           success: false,
-          message: 'Target board was not found in the workspace.' 
+          message: 'Target board was not found in the workspace.'
         });
       }
 
@@ -70,15 +70,20 @@ const boardController = {
    * Create a new project board with a custom title and theme.
    */
   createBoard: async (request, response, next) => {
-    const { boardTitle, themeColor } = request.body;
+    const { title, color } = request.body;
     try {
-      const newlyCreatedBoard = await prisma.board.create({
-        data: { 
-          title: boardTitle, 
-          color: themeColor || "#0079bf" 
-        }
+      if (title) {
+        const newlyCreatedBoard = await prisma.board.create({
+          data: {
+            title: title,
+            color: color || "#0079bf"
+          }
+        });
+        return response.status(201).json(newlyCreatedBoard);
+      } return response.status(400).json({
+        success: false,
+        message: 'Board title is required.'
       });
-      response.status(201).json(newlyCreatedBoard);
     } catch (error) {
       next(error);
     }
@@ -90,7 +95,7 @@ const boardController = {
   updateBoardSettings: async (request, response, next) => {
     const { boardId } = request.params;
     const { title, color, backgroundUrl } = request.body;
-    
+
     try {
       const metadataUpdates = {};
       if (title !== undefined) metadataUpdates.title = title;
