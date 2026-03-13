@@ -102,14 +102,14 @@ export default function TopNav() {
 
       {/* Right: Search + Avatar */}
       <div className="flex items-center gap-2">
-        <div className="relative flex items-center">
+        {/* <div className="relative flex items-center">
           <Search className="w-3.5 h-3.5 text-white/70 absolute left-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search"
             className="bg-white/20 hover:bg-white/30 focus:bg-white focus:text-gray-900 focus:placeholder-gray-400 focus:outline-none text-white placeholder-white/70 text-sm rounded-md pl-8 pr-3 py-1.5 w-40 md:w-48 transition-all focus:w-56 md:focus:w-64"
           />
-        </div>
+        </div> */}
         <div className="h-8 w-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-sm select-none cursor-pointer hover:bg-blue-600 transition-colors">
           D
         </div>

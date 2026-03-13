@@ -217,7 +217,7 @@ export default function BoardClient({ boardId }) {
               isFilterPanelOpen || isFilteringActive ? "bg-white text-blue-800" : "bg-white/20 hover:bg-white/30"
             }`}
           >
-            <Filter className="w-4 h-4" /> Refine
+            <Filter className="w-4 h-4" /> Filter
             {isFilteringActive && (
               <span className="bg-blue-600 text-white text-xs px-1.5 rounded-full ml-1">Active</span>
             )}
@@ -248,7 +248,7 @@ export default function BoardClient({ boardId }) {
                 </div>
               </div>
 
-              {/* Contributor Filter */}
+              {/* Contributor Filter *
               <div className="mb-4">
                 <label className="text-xs font-semibold text-gray-600 uppercase mb-1 block">Contributors</label>
                 <div className="flex flex-col gap-1">
@@ -416,7 +416,7 @@ export default function BoardClient({ boardId }) {
                       className="w-full flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white p-3 rounded-xl transition font-medium"
                     >
                       <Plus className="w-5 h-5" />
-                      Append Column
+                      Add new list
                     </button>
                   )}
                 </div>
